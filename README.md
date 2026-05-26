@@ -72,9 +72,9 @@ Edits that land on the first attempt. Reads that summarize files instead of dump
 
 [Read the full post ↗](https://blog.can.ac/2026/02/12/the-harness-problem/)
 
-## The Pi _you love_, with **batteries included**.
+## The GJC red-claw agent, with **batteries included**.
 
-GJC is a gajae-code derivative that preserves the local-tool strengths of OMP/Pi while exposing the curated gjc runtime surface.
+GJC preserves the local-tool strengths of its upstream lineage while exposing the curated gjc runtime surface.
 
 ### 01 · Code execution w/ tool-calling
 

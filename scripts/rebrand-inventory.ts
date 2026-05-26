@@ -22,14 +22,23 @@ type LegacyHit = {
 	token: string;
 };
 
+type MetadataViolation = {
+	field: string;
+	reason: string;
+};
+
 const repoRoot = process.cwd();
 
 const expectedVisibleDefinitions = ["deep-interview", "ralplan", "team", "ultragoal"] as const;
 const expectedPackageScope = "@gajae-code/";
 const expectedCliBins = ["gjc", "gjc-stats", "gjc-swarm"] as const;
+const expectedRootPackageName = "gajae-code";
+const rootPublicMetadataFields = ["name", "description", "homepage", "repository", "bugs"] as const;
+const rootLegacyScriptKeys = new Set(["test:py"]);
 
 const ignoredDirs = new Set([".git", "node_modules", "dist", "build", "coverage", ".turbo"]);
 const ignoredFiles = new Set(["bun.lock", "Cargo.lock"]);
+const ignoredExtensions = new Set([".png", ".jpg", ".jpeg", ".gif", ".webp", ".ico", ".node"]);
 
 const legacyTokenPatterns = [
 	{ token: "@oh-my-pi", pattern: /@oh-my-pi\b/gi },
@@ -45,8 +54,19 @@ const legacyAllowlist = [
 	},
 	{
 		name: "compatibility-docs",
-		path: /^docs\/(environment-variables|python-repl|task-agent-discovery)\.md$/,
-		rationale: "Compatibility docs may describe retained legacy env/protocol names.",
+		path: /^docs\/(environment-variables|python-repl|task-agent-discovery|REBRANDING_PLAN_260525)\.md$/,
+		rationale: "Compatibility docs and the approved rebranding plan may describe retained legacy env/protocol names and historical boundaries.",
+	},
+	{
+		name: "tool-and-extension-reference-docs",
+		path: /^docs\/(tools\/|skills\/|extension-loading|plugin-manager-installer-plumbing|natives-(addon-loader-runtime|architecture|build-release-debugging)|notebook-tool-runtime)/,
+		rationale: "Reference docs may name retained internal protocols, artifacts, and compatibility paths without presenting them as the current product brand.",
+	},
+
+	{
+		name: "legacy-runtime-root-scripts",
+		path: /^package\.json$/,
+		rationale: "Specific root package scripts may reference retained legacy runtime roots while public metadata remains GJC-branded.",
 	},
 	{
 		name: "runtime-compatibility-internals",
@@ -75,7 +95,7 @@ function walk(dir: string, files: string[] = []): string[] {
 			if (!ignoredDirs.has(entry.name)) walk(path.join(dir, entry.name), files);
 			continue;
 		}
-		if (entry.isFile() && !ignoredFiles.has(entry.name)) files.push(path.join(dir, entry.name));
+		if (entry.isFile() && !ignoredFiles.has(entry.name) && !ignoredExtensions.has(path.extname(entry.name).toLowerCase())) files.push(path.join(dir, entry.name));
 	}
 	return files;
 }
@@ -145,8 +165,15 @@ function listVisibleDefinitions(): VisibleDefinition[] {
 	].sort((a, b) => a.name.localeCompare(b.name) || a.path.localeCompare(b.path));
 }
 
-function allowlistFor(filePath: string): string | undefined {
+function allowlistFor(filePath: string, line: string): string | undefined {
+	if (filePath === "package.json") return rootScriptAllowlistFor(line);
 	return legacyAllowlist.find(entry => entry.path.test(filePath))?.name;
+}
+
+function rootScriptAllowlistFor(line: string): string | undefined {
+	const match = line.match(/^\s*"([^"]+)"\s*:/);
+	if (!match) return undefined;
+	return rootLegacyScriptKeys.has(match[1] ?? "") ? "legacy-runtime-root-scripts" : undefined;
 }
 
 function scanLegacyHits(): LegacyHit[] {
@@ -171,12 +198,33 @@ function scanLegacyHits(): LegacyHit[] {
 			for (const { token, pattern } of legacyTokenPatterns) {
 				pattern.lastIndex = 0;
 				if (pattern.test(line)) {
-					hits.push({ allowlist: allowlistFor(rel), line: index + 1, path: rel, token });
+					hits.push({ allowlist: allowlistFor(rel, line), line: index + 1, path: rel, token });
 				}
 			}
 		}
 	}
 	return hits;
+}
+
+function collectRootMetadataViolations(): MetadataViolation[] {
+	const rootPackage = readJson(path.join(repoRoot, "package.json"));
+	const violations: MetadataViolation[] = [];
+	if (rootPackage.name !== expectedRootPackageName) {
+		violations.push({ field: "name", reason: `expected ${expectedRootPackageName}, found ${String(rootPackage.name ?? "<missing>")}` });
+	}
+
+	for (const field of rootPublicMetadataFields) {
+		const value = rootPackage[field];
+		const serialized = typeof value === "string" ? value : value === undefined ? "" : JSON.stringify(value);
+		for (const { token, pattern } of legacyTokenPatterns) {
+			pattern.lastIndex = 0;
+			if (pattern.test(serialized)) {
+				violations.push({ field, reason: `contains legacy token ${token}` });
+			}
+		}
+	}
+
+	return violations;
 }
 
 const packages = listPackages();
@@ -188,6 +236,7 @@ const nonGajaePackages = packages.filter(pkg => pkg.name && !pkg.name.startsWith
 const observedBins = [...new Set(packages.flatMap(pkg => pkg.bins))].sort();
 const missingBins = expectedCliBins.filter(bin => !observedBins.includes(bin));
 const unexpectedLegacyHits = legacyHits.filter(hit => !hit.allowlist);
+const rootMetadataViolations = collectRootMetadataViolations();
 
 const report = {
 	allowlists: {
@@ -208,6 +257,7 @@ const report = {
 		missingBins,
 		missingDefinitions,
 		nonGajaePackages,
+		rootMetadataViolations,
 		unexpectedDefinitions,
 		unexpectedLegacyHitCount: unexpectedLegacyHits.length,
 	},
@@ -238,6 +288,7 @@ if (process.argv.includes("--strict")) {
 		missingBins.length > 0 ||
 		missingDefinitions.length > 0 ||
 		nonGajaePackages.length > 0 ||
+		rootMetadataViolations.length > 0 ||
 		unexpectedDefinitions.length > 0 ||
 		unexpectedLegacyHits.length > 0;
 	if (hasViolation) process.exit(1);
