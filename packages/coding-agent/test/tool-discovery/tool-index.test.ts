@@ -2,10 +2,12 @@ import { describe, expect, it } from "bun:test";
 import type { DiscoverableTool } from "../../src/tool-discovery/tool-index";
 import {
 	buildDiscoverableToolSearchIndex,
+	collectDiscoverableMCPTools,
 	collectDiscoverableTools,
 	filterBySource,
 	formatDiscoverableToolServerSummary,
 	getDiscoverableTool,
+	isMCPBridgeTool,
 	isMCPToolName,
 	searchDiscoverableTools,
 	selectDiscoverableToolNamesByServer,
@@ -69,6 +71,16 @@ describe("isMCPToolName", () => {
 	});
 });
 
+describe("isMCPBridgeTool", () => {
+	it("requires both the MCP wire prefix and bridge metadata", () => {
+		expect(isMCPBridgeTool(mcpAgentTool("mcp__github_search", "github", "search", "Search"))).toBe(true);
+		expect(isMCPBridgeTool(makeAgentTool("mcp__local_helper"))).toBe(false);
+		expect(isMCPBridgeTool(makeAgentTool("local_helper", { mcpServerName: "github", mcpToolName: "search" }))).toBe(
+			false,
+		);
+	});
+});
+
 // ─── getDiscoverableTool ──────────────────────────────────────────────────────
 
 describe("getDiscoverableTool", () => {
@@ -115,6 +127,17 @@ describe("getDiscoverableTool", () => {
 		const result = getDiscoverableTool(tool);
 		// sorted alphabetically
 		expect(result!.schemaKeys).toEqual(["alpha", "beta", "gamma"]);
+	});
+});
+
+describe("collectDiscoverableMCPTools", () => {
+	it("does not classify local inline mcp__-prefixed tools as MCP bridge tools", () => {
+		const localTool = makeAgentTool("mcp__local_helper", { description: "Local helper" });
+		const bridgeTool = mcpAgentTool("mcp__github_search", "github", "search", "Search repositories");
+
+		expect(collectDiscoverableMCPTools([localTool, bridgeTool]).map(tool => tool.name)).toEqual([
+			"mcp__github_search",
+		]);
 	});
 });
 
