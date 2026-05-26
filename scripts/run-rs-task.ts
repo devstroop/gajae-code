@@ -48,6 +48,13 @@ if (!isRustTaskName(taskName)) {
 	process.exit(1);
 }
 
+if (taskName === "check:rs") {
+	const rustScopeExitCode = await runCommand(["bun", "scripts/check-rust-scope.ts"]);
+	if (rustScopeExitCode !== 0) {
+		process.exit(rustScopeExitCode);
+	}
+}
+
 if (taskName !== "fmt:rs" && !(isCI() || (await hasRustAffectingChanges()))) {
 	console.log(`Skipping ${taskName} (not in CI and no Rust-affecting changes were found).`);
 	process.exit(0);
