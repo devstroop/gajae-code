@@ -1,12 +1,12 @@
 /**
  * Centralized path helpers for gajae-code config directories.
  *
- * Uses GJC_CONFIG_DIR (default ".gjc") for the config root and
- * GJC_CODING_AGENT_DIR to override the agent directory.
+ * Uses PI_CONFIG_DIR (default ".gjc") for the config root and
+ * PI_CODING_AGENT_DIR to override the agent directory.
  *
  * On Linux, if XDG_DATA_HOME / XDG_STATE_HOME / XDG_CACHE_HOME environment
  * variables are set, paths are redirected to XDG-compliant locations under
- * $XDG_*_HOME/gjc/. This requires running `gjc config migrate` first to
+ * $XDG_*_HOME/gjc/. This requires running `omp config migrate` first to
  * move data to the new locations. No filesystem existence checks are performed
  * — if the env var is set, gjc trusts that the migration has been done.
  */
@@ -89,12 +89,12 @@ export function setProjectDir(dir: string): void {
 	process.chdir(projectDir);
 }
 
-/** Get the config directory name relative to home (e.g. ".gjc" or GJC_CONFIG_DIR override). */
+/** Get the config directory name relative to home (e.g. ".gjc" or PI_CONFIG_DIR override). */
 export function getConfigDirName(): string {
 	return process.env.GJC_CONFIG_DIR ?? process.env.PI_CONFIG_DIR ?? CONFIG_DIR_NAME;
 }
 
-/** Get the config agent directory name relative to home (e.g. ".gjc/agent" or GJC_CONFIG_DIR + "/agent"). */
+/** Get the config agent directory name relative to home (e.g. ".gjc/agent" or PI_CONFIG_DIR + "/agent"). */
 export function getConfigAgentDirName(): string {
 	return `${getConfigDirName()}/agent`;
 }
@@ -106,7 +106,7 @@ export function getConfigAgentDirName(): string {
 type XdgCategory = "data" | "state" | "cache";
 
 /**
- * Resolves and caches all gajae-code directory paths. On Linux, when XDG environment
+ * Resolves and caches all omp directory paths. On Linux, when XDG environment
  * variables are set, paths are redirected under $XDG_*_HOME/gjc/. A new
  * instance is created whenever the agent directory changes, which naturally
  * invalidates all cached paths.
@@ -218,7 +218,7 @@ export function getAgentDir(): string {
 	return dirs.agentDir;
 }
 
-/** Get the project-local config directory ( .gjc). */
+/** Get the project-local config directory (.gjc). */
 export function getProjectAgentDir(cwd: string = getProjectDir()): string {
 	return path.join(cwd, CONFIG_DIR_NAME);
 }
@@ -299,7 +299,7 @@ export function getPythonEnvDir(): string {
 	return dirs.rootSubdir("python-env", "data");
 }
 
-/** Get the shared Python gateway state directory (~/.gjc/agent/python-gateway; XDG default: $XDG_STATE_HOME/omp/python-gateway). */
+/** Get the shared Python gateway state directory (~/.gjc/agent/python-gateway; XDG default: $XDG_STATE_HOME/gjc/python-gateway). */
 export function getPythonGatewayDir(): string {
 	return dirs.agentSubdir(undefined, "python-gateway", "state");
 }
@@ -334,7 +334,7 @@ export function getGpuCachePath(): string {
 
 /**
  * Get the GitHub view cache database path (~/.gjc/cache/github-cache.db).
- * Honors the `GJC_GITHUB_CACHE_DB` env var when set so tests can isolate the
+ * Honors the `OMP_GITHUB_CACHE_DB` env var when set so tests can isolate the
  * cache file without touching the rest of the config root.
  */
 export function getGithubCacheDbPath(): string {
